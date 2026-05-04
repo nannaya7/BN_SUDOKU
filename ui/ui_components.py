@@ -100,7 +100,6 @@ class NumberPad:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ActionBar:
-    # (한국어 폰트 호환 아이콘, 영문 레이블)
     _ITEMS = [
         ("되돌리기", "UNDO"),
         ("지우기",   "ERASE"),
@@ -118,27 +117,57 @@ class ActionBar:
         self.notes_active = False
 
         x0, y0 = origin
-        bw  = (width - 3 * 10) // 4
-        bh  = 50
+        bw = (width - 3 * 10) // 4
+        bh = 50
         for i in range(4):
             self._rects.append(pygame.Rect(x0 + i * (bw + 10), y0, bw, bh))
+
+    @staticmethod
+    def _draw_icon(surface: pygame.Surface, name: str,
+                   cx: int, cy: int, color: Tuple):
+        """간단한 pygame 도형 아이콘."""
+        if name == "UNDO":
+            # 반원 화살표
+            pygame.draw.arc(surface, color,
+                            pygame.Rect(cx - 8, cy - 7, 16, 14), 0.2, 3.3, 2)
+            pygame.draw.polygon(surface, color,
+                                [(cx - 8, cy - 7), (cx - 13, cy - 2), (cx - 3, cy - 2)])
+        elif name == "ERASE":
+            # 지우개 사각형
+            pygame.draw.rect(surface, color, pygame.Rect(cx - 8, cy - 5, 16, 10), border_radius=2)
+            pygame.draw.line(surface, surface.get_at((0, 0))[:3],
+                             (cx - 2, cy - 5), (cx - 2, cy + 5), 2)
+        elif name == "NOTES":
+            # 연필 모양
+            pygame.draw.polygon(surface, color,
+                                [(cx - 2, cy + 8), (cx + 6, cy), (cx + 3, cy - 3), (cx - 5, cy + 5)])
+            pygame.draw.polygon(surface, color,
+                                [(cx - 5, cy + 5), (cx - 2, cy + 8), (cx - 7, cy + 9)])
+        elif name == "HINT":
+            # 전구
+            pygame.draw.circle(surface, color, (cx, cy - 2), 6)
+            pygame.draw.rect(surface, color, pygame.Rect(cx - 3, cy + 3, 6, 4), border_radius=1)
 
     def draw(self, surface: pygame.Surface):
         t = self.t
         for i, (ko_label, en_label) in enumerate(self._ITEMS):
             rect   = self._rects[i]
-            active = (i == 2 and self.notes_active)  # index 2 = NOTES/메모
+            active = (i == 2 and self.notes_active)
             color  = t.BUTTON_PRIMARY if active else (
                      t.BUTTON_HOVER   if self._hover[i] else t.BUTTON_COLOR)
             t.draw_soft_rect(surface, rect, color, radius=10)
             ko_c  = (245, 220, 195) if active else t.TEXT_COLOR
             en_c  = (245, 220, 195) if active else t.TEXT_MUTE
-            ko_surf = t.font_small.render(ko_label, True, ko_c)
+            # 아이콘 (상단)
+            self._draw_icon(surface, en_label, rect.centerx, rect.top + 14, ko_c)
+            # 한국어 레이블 (중단)
+            ko_surf = t.font_label.render(ko_label, True, ko_c)
             surface.blit(ko_surf, ko_surf.get_rect(
-                centerx=rect.centerx, centery=rect.top + 15))
+                centerx=rect.centerx, centery=rect.top + 30))
+            # 영문 레이블 (하단)
             en_surf = t.font_label.render(en_label, True, en_c)
             surface.blit(en_surf, en_surf.get_rect(
-                centerx=rect.centerx, centery=rect.bottom - 11))
+                centerx=rect.centerx, centery=rect.bottom - 8))
 
     def handle_event(self, ev: pygame.event.Event):
         if ev.type == pygame.MOUSEMOTION:
@@ -148,6 +177,83 @@ class ActionBar:
             for i, rect in enumerate(self._rects):
                 if rect.collidepoint(ev.pos):
                     self._cbs[i]()
+                    return
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DifficultyCard  (메뉴 화면 — 2×2 카드 그리드)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class DifficultyCardGrid:
+    _CARDS = [
+        ("EASY",   "easy",   "Gentle flow"),
+        ("MED",    "medium", "Balanced"),
+        ("HARD",   "hard",   "Mountain climb"),
+        ("EXPERT", "expert", "True mastery"),
+    ]
+
+    def __init__(self, theme: ThemeManager, origin: Tuple[int, int], width: int,
+                 get_selected: Callable[[], str],
+                 on_select: Callable[[str], None]):
+        self.t            = theme
+        self.get_selected = get_selected
+        self.on_select    = on_select
+        self._rects: List[pygame.Rect] = []
+        self._hover = [False] * 4
+
+        x0, y0 = origin
+        gap    = 10
+        cw     = (width - gap) // 2
+        ch     = 100
+        for i in range(4):
+            col = i % 2
+            row = i // 2
+            rx  = x0 + col * (cw + gap)
+            ry  = y0 + row * (ch + gap)
+            self._rects.append(pygame.Rect(rx, ry, cw, ch))
+
+    @property
+    def total_height(self) -> int:
+        return 2 * 100 + 10  # 2 rows × height + gap
+
+    def draw(self, surface: pygame.Surface):
+        t       = self.t
+        current = self.get_selected()
+        subtitles = [c[2] for c in self._CARDS]
+        for i, (label, key, sub) in enumerate(self._CARDS):
+            rect   = self._rects[i]
+            active = (key == current)
+            if active:
+                bg = t.PANEL_BG
+            elif self._hover[i]:
+                bg = t.BUTTON_HOVER
+            else:
+                bg = t.CARD_BG
+            t.draw_soft_rect(surface, rect, bg, radius=14)
+
+            # 액센트 선 (상단)
+            if active:
+                acc = pygame.Rect(rect.x + 12, rect.y + 8, rect.width - 24, 3)
+                pygame.draw.rect(surface, t.ACCENT_COLOR, acc, border_radius=2)
+
+            # 난이도 레이블
+            lbl_c  = t.TEXT_COLOR if active else t.TEXT_SOFT
+            lbl    = t.font_small.render(label, True, lbl_c)
+            surface.blit(lbl, lbl.get_rect(midleft=(rect.x + 14, rect.centery - 8)))
+
+            # 부제목
+            sub_c  = t.ACCENT_LIGHT if active else t.TEXT_MUTE
+            sub_s  = t.font_label.render(sub, True, sub_c)
+            surface.blit(sub_s, sub_s.get_rect(midleft=(rect.x + 14, rect.centery + 12)))
+
+    def handle_event(self, ev: pygame.event.Event):
+        if ev.type == pygame.MOUSEMOTION:
+            for i, rect in enumerate(self._rects):
+                self._hover[i] = rect.collidepoint(ev.pos)
+        elif ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+            for i, (_, key, _) in enumerate(self._CARDS):
+                if self._rects[i].collidepoint(ev.pos):
+                    self.on_select(key)
                     return
 
 

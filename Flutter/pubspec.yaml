@@ -1,0 +1,33 @@
+name: bn_sudoku
+description: Zen Sudoku - A beautiful Sudoku game ported from Python/Pygame to Flutter.
+publish_to: 'none'
+version: 0.2.101+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Variable.ttf
+    - family: SpaceGrotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Variable.ttf
+  assets:
+    - assets/fonts/

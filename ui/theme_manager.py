@@ -1,5 +1,13 @@
-"""ThemeManager — Zen Sudoku 다크 브라운 테마 (#2C1E1A · #5D3A2E · #B35C3D · #D9B99B)."""
+"""ThemeManager — Zen Sudoku 다크 브라운 테마 (#2C1E1A · #5D3A2E · #B35C3D · #D9B99B).
+
+참조 이미지:
+  Theme/Theme_Color.png         — 컬러 팔레트 (Primary #5D3A2E, Secondary #B35C3D, Tertiary #D9B99B)
+  Theme/Theme_opening_screen.png — 오프닝 화면 디자인 목업
+  Theme/Theme_play_screen.png   — 플레이 화면 디자인 목업
+"""
+import os
 import pygame
+from typing import Optional
 
 
 class ThemeManager:
@@ -56,17 +64,38 @@ class ThemeManager:
     SHADOW_DARK      = ( 22,  14,  10)
     SHADOW_LIGHT     = ( 80,  56,  44)
 
+    _SG_BOLD = os.path.join("fonts", "static", "SpaceGrotesk-Bold.ttf")
+
     def __init__(self):
         pygame.font.init()
         self.font_title  = self._load(34, bold=True)
         self.font_large  = self._load(42, bold=True)
-        self.font_medium = self._load(26, bold=True)
-        self.font_cell   = self._load(28, bold=True)
+        self.font_medium = self._load_sg(26)   # 숫자패드 숫자
+        self.font_cell   = self._load_sg(28)   # 보드 셀 숫자
         self.font_small  = self._load(16, bold=True)
         self.font_tiny   = self._load(12, bold=True)
-        self.font_note   = self._load(11, bold=True)
+        self.font_note   = self._load_sg(11)   # 메모 숫자
         self.font_label  = self._load(11, bold=True)
         self.font_sub    = self._load(13, bold=False)
+        # Theme 이미지 (디자인 목업 참조 — 메뉴·플레이 화면 레이아웃 기준)
+        self.opening_bg: Optional[pygame.Surface] = self._load_image(
+            os.path.join("Theme", "Theme_opening_screen.png"))
+        self.play_bg: Optional[pygame.Surface] = self._load_image(
+            os.path.join("Theme", "Theme_play_screen.png"))
+
+    def _load_sg(self, size: int) -> pygame.font.Font:
+        """Space Grotesk Bold 로드 (없으면 기본 폰트 폴백)."""
+        try:
+            return pygame.font.Font(self._SG_BOLD, size)
+        except Exception:
+            return self._load(size, bold=True)
+
+    @staticmethod
+    def _load_image(path: str) -> Optional[pygame.Surface]:
+        try:
+            return pygame.image.load(path).convert_alpha()
+        except Exception:
+            return None
 
     @staticmethod
     def _load(size: int, bold: bool = False) -> pygame.font.Font:

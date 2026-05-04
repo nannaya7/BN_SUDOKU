@@ -44,9 +44,14 @@ class BoardRenderer:
         t = self.t
         tray = self.board_rect()
 
-        # 다크 트레이 배경 (3×3 블록 사이 갭을 자연스럽게 채움)
+        # 다크 트레이 배경
         pygame.draw.rect(surface, t.BG_DEEP, tray, border_radius=16)
-        pygame.draw.rect(surface, t.DIVIDER, tray, width=1, border_radius=16)
+
+        # 3×3 블록 경계선 — 블록 사이 갭 중앙에 2px 선 (디자인 목업 기준)
+        self._draw_block_lines(surface)
+
+        # 바깥 테두리 4px
+        pygame.draw.rect(surface, t.DIVIDER, tray, width=4, border_radius=16)
 
         sel_val = board_grid[selected[0]][selected[1]] if selected is not None else 0
         error_set = set(error_cells)
@@ -88,6 +93,22 @@ class BoardRenderer:
                     surface.blit(text, text.get_rect(center=rect.center))
                 elif notes[r][c]:
                     self._draw_notes(surface, rect, notes[r][c])
+
+    def _draw_block_lines(self, surface: pygame.Surface):
+        """3×3 블록 경계 강조선 (셀 갭 중앙, 2px)."""
+        t   = self.t
+        ox  = t.GRID_OFFSET_X
+        oy  = t.GRID_OFFSET_Y
+        tot = t.CELL_SIZE * 9 + t.BLOCK_GAP * 2
+        cs  = t.CELL_SIZE
+        bg  = t.BLOCK_GAP
+        # 블록 경계는 col/row 3, 6 위치 (bc=1,2 → gap 중앙)
+        for b in (1, 2):
+            # gap 중앙 = ox + b*3*cs + (b-1)*bg + bg//2
+            vx = ox + b * 3 * cs + (b - 1) * bg + bg // 2
+            pygame.draw.line(surface, t.ACCENT_COLOR, (vx, oy), (vx, oy + tot), 3)
+            hy = oy + b * 3 * cs + (b - 1) * bg + bg // 2
+            pygame.draw.line(surface, t.ACCENT_COLOR, (ox, hy), (ox + tot, hy), 3)
 
     def draw_progress_bar(
         self,

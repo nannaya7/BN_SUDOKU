@@ -1,7 +1,8 @@
-# Zen Sudoku (Python / Pygame)
+# Sudoku (Python / Pygame + Flutter)
 
-**Zen Sudoku**는 다크 브라운 팔레트(`#2C1E1A · #5D3A2E · #B35C3D · #D9B99B`)로 제작한 Python Pygame 수도쿠 게임입니다.
-모바일 세로 레이아웃(420×800)을 기반으로 설계되었으며, 향후 **Flutter 모바일 포팅**을 염두에 두고 Core 로직과 UI 레이어를 분리했습니다.
+**Sudoku**는 다크 브라운 팔레트(`#2C1E1A · #5D3A2E · #B35C3D · #D9B99B`)로 제작한 수도쿠 게임입니다.
+Python/Pygame 버전과 **Flutter 모바일 앱** 버전 두 가지로 제공됩니다.
+Core 로직과 UI 레이어가 분리되어 있어 두 플랫폼 간 구조가 1:1 대응됩니다.
 
 ---
 
@@ -145,8 +146,8 @@ chmod +x build.sh
 ## 프로젝트 구조
 
 ```text
-M_Sudoku/
-├── main.py                  # 진입점 — GameWindow().run()
+BN_SUDOKU/
+├── main.py                  # Python 진입점 — GameWindow().run()
 ├── requirements.txt
 ├── README.md
 │
@@ -158,17 +159,41 @@ M_Sudoku/
 │
 ├── ui/                      # Pygame UI 레이어
 │   ├── theme_manager.py     # 다크 브라운 색상 팔레트, 폰트 로딩
-│   ├── board_renderer.py    # 보드 및 셀 렌더링, 진행 바
+│   ├── board_renderer.py    # 보드 및 셀 렌더링
 │   ├── ui_components.py     # Button, NumberPad, ActionBar, DifficultyTabs, BottomNav, Popup
 │   └── game_window.py       # 메인 루프, 이벤트 처리 (모바일 세로 레이아웃)
 │
 ├── utils/
-│   └── timer.py             # 경과 시간 추적 (start/pause/resume/reset)
+│   ├── timer.py             # 경과 시간 추적 (start/pause/resume/reset)
+│   ├── save_manager.py      # JSON 게임 저장/불러오기
+│   └── score_manager.py     # 난이도별 최고기록 저장
 │
-└── Theme/                   # 디자인 레퍼런스 이미지
-    ├── Theme_Color.png
-    ├── Theme_opening_screen.png
-    └── Theme_play_screen.png
+├── Theme/                   # 디자인 레퍼런스 이미지
+│   ├── Theme_Color.png
+│   ├── Theme_opening_screen.png
+│   └── Theme_play_screen.png
+│
+└── Flutter/                 # Flutter 모바일 앱 (iOS / Android)
+    ├── pubspec.yaml
+    ├── lib/
+    │   ├── main.dart                    # 앱 진입점, 라우터
+    │   ├── core/
+    │   │   ├── sudoku_board.dart        # Python SudokuBoard → Dart
+    │   │   ├── sudoku_generator.dart    # Python SudokuGenerator → Dart
+    │   │   ├── sudoku_solver.dart       # Python SudokuSolver → Dart
+    │   │   └── game_session.dart        # ChangeNotifier 상태 관리
+    │   ├── ui/
+    │   │   ├── app_theme.dart           # 색상/폰트 상수 (ThemeManager 대응)
+    │   │   ├── board_painter.dart       # CustomPainter (BoardRenderer 대응)
+    │   │   └── screens/
+    │   │       ├── menu_screen.dart     # 메인 메뉴
+    │   │       └── game_screen.dart     # 게임 화면
+    │   └── utils/
+    │       ├── game_timer.dart          # dart:async 타이머
+    │       ├── save_manager.dart        # shared_preferences 저장
+    │       └── score_manager.dart       # 최고기록 관리
+    └── assets/
+        └── fonts/                       # Inter / Pretendard / SpaceGrotesk
 ```
 
 ---
@@ -221,3 +246,44 @@ M_Sudoku/
 | `ThemeManager` 색상값 | `ThemeData` / `ColorScheme` |
 
 > `core/` 폴더는 Flutter 포팅 시 Dart로 직접 변환 가능하도록 UI 의존성이 없습니다.
+
+---
+
+## Flutter 앱 실행
+
+```bash
+cd Flutter
+flutter pub get
+flutter run
+```
+
+### 폰트
+
+| 용도 | 폰트 | 변수명 |
+| --- | --- | --- |
+| 숫자 (보드, 패드, 타이머) | Inter Variable | `AppTheme.fontNumber` |
+| 한글 UI 텍스트 | Pretendard Variable | `AppTheme.fontKorean` |
+| 영문 타이틀 (SUDOKU) | Space Grotesk Bold | `AppTheme.fontEnglish` |
+
+---
+
+## 변경 이력
+
+### V.0.03.100 (2026-05-04)
+- **Flutter 앱 추가**: Python/Pygame 로직을 Flutter/Dart로 포팅 완료
+  - `core/` → Dart 1:1 변환 (SudokuBoard, Generator, Solver, GameSession)
+  - `BoardRenderer` → `CustomPainter` (board_painter.dart)
+  - `GameSession` → `ChangeNotifier` + Provider
+  - 메뉴 화면, 게임 화면, 숫자 패드, 액션 바, 팝업 구현
+- **리팩토링**: 전체 UI 텍스트 한글화 (영문 레이블 제거)
+- **폰트 정리**: 한글 텍스트 `fontKorean(Pretendard)`, 숫자 `fontNumber(Inter)` 통일
+- **버그 수정**: 홈 화면에서 "계속하기" 클릭 시 게임으로 복귀하지 않는 문제 (`resumeGame()` 상태 조건 수정)
+- **UI 개선**: 진행도 바(PUZZLE COMPLETION) 섹션 제거
+- **앱 이름**: "Zen Sudoku" → "SUDOKU"
+- **Python**: `utils/save_manager.py`, `utils/score_manager.py` 추가
+
+### V.0.02.101 (2026-04-25)
+- README.md 전면 개정
+
+### V.0.02.100 (2026-04-25)
+- Zen Sudoku 모바일 세로 레이아웃 전환 (420×800)

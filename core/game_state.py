@@ -1,7 +1,7 @@
 """GameState 및 GameSession."""
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .sudoku_board import SudokuBoard
 from .sudoku_generator import SudokuGenerator
@@ -10,59 +10,120 @@ from utils.timer import Timer
 
 
 class GameState(Enum):
-    MENU = auto()
+    MENU       = auto()
     DIFFICULTY = auto()
-    PLAYING = auto()
-    PAUSED = auto()
-    WIN = auto()
-    GAME_OVER = auto()
+    PLAYING    = auto()
+    PAUSED     = auto()
+    WIN        = auto()
+    GAME_OVER  = auto()
 
 
 @dataclass
 class GameSession:
-    difficulty: str = "easy"
-    board: Optional[SudokuBoard] = None
-    timer: Timer = field(default_factory=Timer)
-    mistakes: int = 0
-    max_mistakes: int = 3
-    hints_used: int = 0
-    max_hints: int = 3
-    selected: Optional[Tuple[int, int]] = None
-    notes: List[List[Set[int]]] = field(default_factory=list)
-    history: List[Tuple[List[List[int]], List[List[Set[int]]], int]] = field(default_factory=list)
-    notes_mode: bool = False
-    state: GameState = GameState.PLAYING
+    difficulty:    str                                                      = "easy"
+    board:         Optional[SudokuBoard]                                    = None
+    timer:         Timer                                                    = field(default_factory=Timer)
+    mistakes:      int                                                      = 0
+    max_mistakes:  int                                                      = 3
+    hints_used:    int                                                      = 0
+    max_hints:     int                                                      = 3
+    selected:      Optional[Tuple[int, int]]                                = None
+    notes:         List[List[Set[int]]]                                     = field(default_factory=list)
+    history:       List[Tuple[List[List[int]], List[List[Set[int]]], int]]  = field(default_factory=list)
+    notes_mode:    bool                                                     = False
+    state:         GameState                                                = GameState.MENU  # 앱 시작 → 메뉴
+
+    # ── 게임 시작 ──────────────────────────────────────────────────────────────
 
     def new_game(self, difficulty: str):
-        self.difficulty = difficulty
+        self.difficulty  = difficulty
         puzzle, solution = SudokuGenerator.generate(difficulty)
-        self.board = SudokuBoard(puzzle, solution)
-        self.mistakes = 0
-        self.hints_used = 0
-        self.selected = None
-        self.notes = [[set() for _ in range(9)] for _ in range(9)]
-        self.history = []
-        self.notes_mode = False
-        self.state = GameState.PLAYING
+        self.board       = SudokuBoard(puzzle, solution)
+        self.mistakes    = 0
+        self.hints_used  = 0
+        self.selected    = None
+        self.notes       = [[set() for _ in range(9)] for _ in range(9)]
+        self.history     = []
+        self.notes_mode  = False
+        self.state       = GameState.PLAYING
         self.timer.reset()
         self.timer.start()
+
+    # ── 화면 전환 ──────────────────────────────────────────────────────────────
+
+    def go_to_menu(self):
+        """현재 게임을 보존한 채 메뉴로 이동. PLAYING 중이면 타이머 정지."""
+        if self.state == GameState.PLAYING:
+            self.timer.pause()
+        self.state = GameState.MENU
+
+    def resume(self):
+        """메뉴에서 진행 중인 게임으로 복귀."""
+        if self.board is not None and self.state == GameState.MENU:
+            self.state = GameState.PLAYING
+            self.timer.resume()
+
+    def has_active_game(self) -> bool:
+        return self.board is not None and self.state in (
+            GameState.MENU, GameState.PLAYING, GameState.PAUSED
+        )
+
+    # ── 직렬화 (저장/불러오기) ────────────────────────────────────────────────
+
+    def to_dict(self) -> Dict[str, Any]:
+        if self.board is None:
+            return {}
+        return {
+            "difficulty": self.difficulty,
+            "grid":       self.board.grid,
+            "original":   self.board.original,
+            "solution":   self.board.solution,
+            "notes":      [[sorted(s) for s in row] for row in self.notes],
+            "mistakes":   self.mistakes,
+            "hints_used": self.hints_used,
+            "elapsed":    self.timer.get_elapsed(),
+        }
+
+    def from_dict(self, data: Dict[str, Any]) -> bool:
+        try:
+            self.difficulty  = data["difficulty"]
+            self.board       = SudokuBoard(data["grid"], data["solution"])
+            self.board.original = data["original"]
+            self.notes       = [[set(s) for s in row] for row in data["notes"]]
+            self.mistakes    = data["mistakes"]
+            self.hints_used  = data["hints_used"]
+            self.history     = []
+            self.notes_mode  = False
+            self.selected    = None
+            self.timer.reset()
+            self.timer._accum   = float(data["elapsed"])
+            self.timer._running = False
+            self.state       = GameState.PLAYING
+            self.timer.resume()
+            return True
+        except Exception:
+            return False
+
+    # ── 히스토리 ──────────────────────────────────────────────────────────────
 
     def _snapshot(self):
         if not self.board:
             return
-        grid_copy = [row[:] for row in self.board.grid]
+        grid_copy  = [row[:] for row in self.board.grid]
         notes_copy = [[set(s) for s in row] for row in self.notes]
         self.history.append((grid_copy, notes_copy, self.mistakes))
         if len(self.history) > 100:
             self.history.pop(0)
 
     def undo(self):
-        if not self.board or not self.history:
+        if self.state != GameState.PLAYING or not self.board or not self.history:
             return
         grid, notes, mistakes = self.history.pop()
-        self.board.grid = grid
-        self.notes = notes
-        self.mistakes = mistakes
+        self.board.grid  = grid
+        self.notes       = notes
+        self.mistakes    = mistakes
+
+    # ── 입력 처리 ─────────────────────────────────────────────────────────────
 
     def input_number(self, num: int):
         if self.state != GameState.PLAYING or not self.board or not self.selected:
@@ -88,7 +149,6 @@ class GameSession:
 
         self.board.grid[r][c] = num
         self.notes[r][c].clear()
-        # peer notes clear
         for i in range(9):
             self.notes[r][i].discard(num)
             self.notes[i][c].discard(num)
@@ -97,7 +157,6 @@ class GameSession:
             for cc in range(bc, bc + 3):
                 self.notes[rr][cc].discard(num)
 
-        # validate
         if self.board.solution and self.board.solution[r][c] != num:
             self.mistakes += 1
             if self.mistakes >= self.max_mistakes:
@@ -128,15 +187,15 @@ class GameSession:
         if h is None:
             return
         r, c, n = h
-        if self.selected and self.board.grid[self.selected[0]][self.selected[1]] == 0 \
-                and not self.board.is_fixed(*self.selected):
+        if (self.selected
+                and self.board.grid[self.selected[0]][self.selected[1]] == 0
+                and not self.board.is_fixed(*self.selected)):
             r, c = self.selected
             n = self.board.solution[r][c] if self.board.solution else n
         self._snapshot()
         self.board.grid[r][c] = n
-        self.board.original[r][c] = True
         self.notes[r][c].clear()
-        self.selected = (r, c)
+        self.selected  = (r, c)
         self.hints_used += 1
         if self.board.is_complete():
             self.state = GameState.WIN
